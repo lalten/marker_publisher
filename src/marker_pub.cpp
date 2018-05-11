@@ -99,11 +99,15 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
         nh_node.param<float>(o_str, marker_id_temp, -1);
 
         if (marker_id_temp != -1)
+        {
             detected_markers[i].calculateExtrinsics(marker_id_temp, TheCameraParameters.CameraMatrix,
                                                     TheCameraParameters.Distorsion, false);
+        }
         else
+        {
             detected_markers[i].calculateExtrinsics(markerSizeMeters, TheCameraParameters.CameraMatrix,
                                                     TheCameraParameters.Distorsion, false);
+        }
 
         detected_markers[i].draw(cv_ptr->image, cv::Scalar(0, 0, 255), 3, true, true);
 //        aruco::CvDrawingUtils::draw3dCube(cv_ptr->image, detected_markers[i], TheCameraParameters);
