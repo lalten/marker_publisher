@@ -49,7 +49,6 @@ MarkerPosePublisher::MarkerPosePublisher() : nh_node("~") {
 
     marker_msg_pub = marker_publisher::MarkerArray::Ptr(new marker_publisher::MarkerArray());
     //The same frame_id & seq for every marker in each frame
-    marker_msg_pub->header.frame_id = camera_frame;
     marker_msg_pub->header.seq = 0;
 }
 
@@ -69,7 +68,17 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
         bitwise_not ( cv_ptr->image, cv_ptr->image );
     }
 
-    ros::Time curr_stamp(ros::Time::now());
+    std_msgs::Header msg_header;
+    msg_header.stamp = ros::Time::now();
+    if(msg->header.stamp != ros::Time(0))
+    {
+      msg_header.stamp = msg->header.stamp;
+    }
+    msg_header.frame_id = camera_frame;
+    if(camera_frame == "")
+    {
+      msg_header.frame_id = msg->header.frame_id;
+    }
 
     static tf::TransformBroadcaster br;
     std::vector<aruco::Marker> detected_markers = TheMarkerDetector.detect(
@@ -77,8 +86,7 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
 
     marker_msg_pub->markers.clear();
     marker_msg_pub->markers.resize(detected_markers.size());
-    marker_msg_pub->header.stamp = curr_stamp;
-    marker_msg_pub->header.seq++;
+    marker_msg_pub->header = msg_header;
 
     for (size_t i = 0; i < detected_markers.size(); ++i) {
         marker_publisher::Marker &marker_i = marker_msg_pub->markers.at(i);
@@ -115,7 +123,7 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
 
         tf::Transform object_transform = arucoMarker2Tf(detected_markers[i]);
 
-        br.sendTransform(tf::StampedTransform(object_transform, ros::Time::now(), camera_frame, o_str));
+        br.sendTransform(tf::StampedTransform(object_transform, msg_header.stamp, msg_header.frame_id, o_str));
 
         geometry_msgs::Pose marker_pose_data;
 
@@ -130,7 +138,7 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
         marker_pose_data.orientation.z = marker_quaternion.getZ();
         marker_pose_data.orientation.w = marker_quaternion.getW();
 
-        publish_marker(marker_pose_data, markerId);
+        publish_marker(marker_pose_data, markerId, msg_header);
 
         //Publish markers
         marker_publisher::Marker &marker_i = marker_msg_pub->markers.at(i);
@@ -154,7 +162,7 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
         return;
     }
 
-    debug->header = marker_msg_pub->header;
+    debug->header = msg_header;
     markers_pub_debug.publish(debug);
 }
 
@@ -178,10 +186,9 @@ tf::Transform MarkerPosePublisher::arucoMarker2Tf(const aruco::Marker &marker) {
     return tf::Transform(marker_tf_rot, marker_tf_tran);
 }
 
-void MarkerPosePublisher::publish_marker(geometry_msgs::Pose marker_pose, int marker_id) {
+void MarkerPosePublisher::publish_marker(geometry_msgs::Pose marker_pose, int marker_id, std_msgs::Header msg_header) {
     visualization_msgs::Marker marker;
-    marker.header.frame_id = camera_frame;
-    marker.header.stamp = ros::Time::now();
+    marker.header = msg_header;
     marker.ns = "basic_shapes";
     marker.id = marker_id;
     marker.type = visualization_msgs::Marker::CUBE;

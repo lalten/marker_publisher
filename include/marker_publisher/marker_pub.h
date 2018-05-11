@@ -2,6 +2,7 @@
 #include <std_msgs/String.h>
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <std_msgs/Header.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 #include <string>
@@ -34,7 +35,7 @@ public:
 
     tf::Transform arucoMarker2Tf(const aruco::Marker &);
 
-    void publish_marker(geometry_msgs::Pose, int);
+    void publish_marker(geometry_msgs::Pose, int, std_msgs::Header);
 
     aruco::CameraParameters rosCameraInfo2ArucoCamParams(const sensor_msgs::CameraInfo& cam_info,
                                                          bool useRectifiedParameters);
