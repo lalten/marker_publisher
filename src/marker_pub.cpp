@@ -156,7 +156,7 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
 
 
 tf::Transform MarkerPosePublisher::arucoMarker2Tf(const aruco::Marker &marker) {
-    cv::Mat marker_rotation(3, 3, CV_32FC1);
+    cv::Mat marker_rotation;
     cv::Rodrigues(marker.Rvec, marker_rotation);
     cv::Mat marker_translation = marker.Tvec;
 
