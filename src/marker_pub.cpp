@@ -25,6 +25,12 @@ MarkerPosePublisher::MarkerPosePublisher() : nh_node("~") {
     if(useCamInfo)
     {
         sensor_msgs::CameraInfoConstPtr msg = ros::topic::waitForMessage<sensor_msgs::CameraInfo>("camera_info", nh_node);//, 10.0);
+        // Check if camera_info msg actually contains calibration information
+        if(msg->K.at(0) == 0.0) // "clients may assume that K[0] == 0.0 indicates an uncalibrated camera"
+        {
+          ROS_ERROR_STREAM("Camera is uncalibrated!");
+          ros::shutdown();
+        }
         nh_node.param<bool>("image_is_rectified", useRectifiedImages, true);
         TheCameraParameters = rosCameraInfo2ArucoCamParams(*msg, useRectifiedImages);
     }
