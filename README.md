@@ -19,6 +19,12 @@ You need to calibrate the camera and copy the generated file in */config* folder
 
 [ArUco: a minimal library for Augmented Reality applications based on OpenCV](http://www.uco.es/investiga/grupos/ava/node/26)
 
+You can have rosdep install Aruco. It might ask you for your password to install Aruco to `/usr/local`.
+```
+sudo sh -c 'echo "yaml https://rawgit.com/lalten/marker_publisher/master/rosdep/aruco.yaml " > /etc/ros/rosdep/sources.list.d/15-marker_publisher.list'
+rosdep update
+rosdep install --from-paths . --ignore-src --rosdistro=$ROS_DISTRO -y
+```
 
 ### ROS API
 

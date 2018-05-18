@@ -1,0 +1,4 @@
+aruco:
+  ubuntu:
+    source:
+      uri: "https://rawgit.com/lalten/marker_publisher/master/rosdep/aruco.rdmanifest"

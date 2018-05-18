@@ -1,0 +1,43 @@
+uri: "https://rawgit.com/lalten/marker_publisher/master/rosdep/empty.tar"
+md5sum: df41600634ca08cb5082877eb64220c9
+
+install-script: |
+  #!/bin/bash
+
+  set -e
+  set -u
+  set -x
+
+  version="3.0.10"
+  pkg="aruco-${version}.zip"
+  url="https://netix.dl.sourceforge.net/project/aruco/3.0.0/${pkg}"
+
+  cd `mktemp -d` # make a temporary dir and cd to it
+
+  wget -O $pkg $url
+  unzip $pkg
+
+  cd aruco-${version}
+  mkdir build && cd build
+
+  cmake ..
+  make -j
+  sudo make install
+
+check-presence-script: |
+  #!/bin/bash
+
+  if `pkg-config aruco`; then
+    version=$(pkg-config aruco --modversion)
+
+    if dpkg --compare-versions "${version}" "ge" "3.0.4"; then
+      echo "Found aruco version ${version}"
+      exit 0
+    else
+      echo "Found aruco with too low version ${version}"
+      exit 2
+    fi
+  else
+    echo "Could not find aruco library"
+    exit 1
+  fi
