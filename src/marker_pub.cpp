@@ -1,131 +1,104 @@
 #include "marker_publisher/marker_pub.h"
 
-MarkerPosePublisher::MarkerPosePublisher() : nh_node("~") {
+#include <cv_bridge/cv_bridge.h>
+#include <image_transport/transport_hints.h>
+
+MarkerPosePublisher::MarkerPosePublisher() : nh_node("~"), img_transport(nh_node) {
+    // set dictionary and error correction rate
+    std::string dict_type;
     nh_node.param<std::string>("dict_type", dict_type, "ALL_DICTS");
-    TheMarkerDetector.setDictionary(dict_type,
-                                    0.6f); //errorCorrectionRate error correction rate respect to the maximun error correction capability for each dictionary. (default 0.6).
+    float error_correction_rate; //error correction rate respect to the maximum error correction capability for each dictionary.
+    nh_node.param<float>("error_correction_rate", error_correction_rate, 0.6);
+    TheMarkerDetector.setDictionary(dict_type, error_correction_rate);
 
     // set detection mode and minimum marker size
+    float markerSizeMin;
     nh_node.param<float>("marker_min", markerSizeMin, 0.01);
+    std::string detectionMode;
     nh_node.param<std::string>("detection_mode", detectionMode, "DM_NORMAL");
-
+    aruco::DetectionMode detectionModeEnum = aruco::DetectionMode::DM_NORMAL;
     if (detectionMode == "DM_NORMAL"){
         detectionModeEnum = aruco::DetectionMode::DM_NORMAL;
     } else if (detectionMode == "DM_FAST"){
         detectionModeEnum = aruco::DetectionMode::DM_FAST;
     } else if (detectionMode == "DM_VIDEO_FAST"){
         detectionModeEnum = aruco::DetectionMode::DM_VIDEO_FAST;
+    } else {
+      ROS_ERROR_STREAM("Unknown detection_mode "<<detectionMode);
+      ros::shutdown();
     }
-    //TheMarkerDetector.setDetectionMode(detectionModeEnum, markerSizeMin);
+    TheMarkerDetector.setDetectionMode(detectionModeEnum, markerSizeMin);
 
+    // Overwrite the outgoing header frame
     nh_node.param<std::string>("camera_frame", camera_frame, "");
 
-    // load camera parameters from camerainfo or YAML file
-    nh_node.param<bool>("use_camera_info", useCamInfo, true);
-    if(useCamInfo)
-    {
-        sensor_msgs::CameraInfoConstPtr msg = ros::topic::waitForMessage<sensor_msgs::CameraInfo>("camera_info", nh_node);//, 10.0);
-        // Check if camera_info msg actually contains calibration information
-        if(msg->K.at(0) == 0.0) // "clients may assume that K[0] == 0.0 indicates an uncalibrated camera"
-        {
-          ROS_ERROR_STREAM("Camera is uncalibrated!");
-          ros::shutdown();
-        }
-        nh_node.param<bool>("image_is_rectified", useRectifiedImages, true);
-        TheCameraParameters = rosCameraInfo2ArucoCamParams(*msg, useRectifiedImages);
-    }
-    else {
-        try {
-            nh_node.param<std::string>("TheCameraParameters_path", TheCameraParameters_path, "");
-            TheCameraParameters.readFromXMLFile(TheCameraParameters_path);
-        } catch (cv::Exception) {
-            ROS_ERROR("Cannot load camera parameters!");
-        }
-    }
-
+    // Default marker size
     nh_node.param<float>("markerSizeMeters", markerSizeMeters, -1);
-    nh_node.param<bool>("invert_image", invertImage, -1);
 
+    // Set default_transport param to "compressed" in case you're using a rosbag that only contains compressed images
+    std::string default_transport;
+    nh_node.param<std::string>("default_transport", default_transport, "raw");
+    image_transport::TransportHints transport_hints(default_transport);
+    sub = img_transport.subscribeCamera("image_raw", 1, &MarkerPosePublisher::callBackColor, this, transport_hints);
 
-    sub = nh_node.subscribe("image_raw", 1, &MarkerPosePublisher::callBackColor, this);
-
-    markers_pub_tf = nh_node.advertise<visualization_msgs::Marker>("Estimated_marker", 1);
+    markers_pub_visualization = nh_node.advertise<visualization_msgs::Marker>("Estimated_marker", 1);
     markers_pub_array = nh_node.advertise<marker_publisher::MarkerArray>("MarkerArray", 1);
-    markers_pub_debug = nh_node.advertise<sensor_msgs::Image>("debug", 1);
+    markers_pub_debug = img_transport.advertise("debug", 1);
 
     marker_msg_pub = marker_publisher::MarkerArray::Ptr(new marker_publisher::MarkerArray());
-    //The same frame_id & seq for every marker in each frame
-    marker_msg_pub->header.seq = 0;
 }
 
-void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
-    cv_bridge::CvImagePtr cv_ptr;
+void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg, const sensor_msgs::CameraInfoConstPtr& cinfo) {
 
-    try {
-        cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+    // If camera parameters are not defined yet, read them
+    if(!TheCameraParameters.isValid())
+    {
+        // Check if camera_info msg actually contains calibration information
+        if(cinfo->K.at(0) == 0.0) // "clients may assume that K[0] == 0.0 indicates an uncalibrated camera"
+        {
+            ROS_ERROR_STREAM("Camera is uncalibrated!");
+            ros::shutdown();
+        }
+        bool useRectifiedImages;
+        nh_node.param<bool>("image_is_rectified", useRectifiedImages, true);
+        TheCameraParameters = rosCameraInfo2ArucoCamParams(*cinfo, useRectifiedImages);
     }
 
+    // Convert to grayscale (otherwise Aruco will do internally)
+    // Will share instead of copy if input image already is mono8 encoded
+    cv_bridge::CvImageConstPtr cv_ptr;
+    try {
+        cv_ptr = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::MONO8);
+    }
     catch (cv_bridge::Exception &e) {
         ROS_ERROR("cv_bridge exception: %s", e.what());
         return;
     }
 
-    if(invertImage){
-        bitwise_not ( cv_ptr->image, cv_ptr->image );
+    // copy stamp, header, seq. Overwrite frame_id if configured.
+    std_msgs::Header msg_header = msg->header;
+    if(camera_frame != "")
+    {
+      msg_header.frame_id = camera_frame;
     }
 
-    std_msgs::Header msg_header;
-    msg_header.stamp = ros::Time::now();
-    if(msg->header.stamp != ros::Time(0))
-    {
-      msg_header.stamp = msg->header.stamp;
-    }
-    msg_header.frame_id = camera_frame;
-    if(camera_frame == "")
-    {
-      msg_header.frame_id = msg->header.frame_id;
-    }
-
-    static tf::TransformBroadcaster br;
-    std::vector<aruco::Marker> detected_markers = TheMarkerDetector.detect(
-            cv_ptr->image); //, TheCameraParameters, markerSizeMeters);
+    std::vector<aruco::Marker> detected_markers = TheMarkerDetector.detect(cv_ptr->image);
 
     marker_msg_pub->markers.clear();
     marker_msg_pub->markers.resize(detected_markers.size());
     marker_msg_pub->header = msg_header;
 
     for (size_t i = 0; i < detected_markers.size(); ++i) {
-        marker_publisher::Marker &marker_i = marker_msg_pub->markers.at(i);
-        marker_i.idx = detected_markers[i].id;
-    }
-
-
-    tf::StampedTransform cameraToReference;
-    cameraToReference.setIdentity();
-
-    for (size_t i = 0; i < detected_markers.size(); ++i) {
         std::ostringstream o;
-        auto markerId = detected_markers[i].id;
+        int markerId = detected_markers[i].id;
         o << "marker_" << markerId;
         std::string o_str = o.str();
 
-        marker_id_temp = -1.0f;
-        nh_node.param<float>(o_str, marker_id_temp, -1);
+        float marker_size;
+        nh_node.param<float>(o_str, marker_size, markerSizeMeters); // overwrite size of e.g. marker_0
 
-        if (marker_id_temp != -1)
-        {
-            detected_markers[i].calculateExtrinsics(marker_id_temp, TheCameraParameters.CameraMatrix,
-                                                    TheCameraParameters.Distorsion, false);
-        }
-        else
-        {
-            detected_markers[i].calculateExtrinsics(markerSizeMeters, TheCameraParameters.CameraMatrix,
-                                                    TheCameraParameters.Distorsion, false);
-        }
-
-        detected_markers[i].draw(cv_ptr->image, cv::Scalar(0, 0, 255), 3, true, true);
-//        aruco::CvDrawingUtils::draw3dCube(cv_ptr->image, detected_markers[i], TheCameraParameters);
-        aruco::CvDrawingUtils::draw3dAxis(cv_ptr->image, detected_markers[i], TheCameraParameters);
+        detected_markers[i].calculateExtrinsics(marker_size, TheCameraParameters.CameraMatrix,
+                                                TheCameraParameters.Distorsion, false);
 
         tf::Transform object_transform = arucoMarker2Tf(detected_markers[i]);
 
@@ -148,6 +121,7 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
 
         //Publish markers
         marker_publisher::Marker &marker_i = marker_msg_pub->markers.at(i);
+        marker_i.idx = markerId;
         tf::Transform transform = arucoMarker2Tf(detected_markers[i]);
         tf::poseTFToMsg(transform, marker_i.pose.pose);
     }
@@ -158,18 +132,17 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
     }
 
     // publish debug image with markers
-    sensor_msgs::ImagePtr debug;
-    try {
-        debug = cv_ptr->toImageMsg();
+    if(markers_pub_debug.getNumSubscribers() > 0)
+    {
+      cv_bridge::CvImagePtr debug_img_msg = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+        for(auto &m : detected_markers)
+        {
+            m.draw(debug_img_msg->image, cv::Scalar(0, 0, 255), 3, true, true);
+//          aruco::CvDrawingUtils::draw3dCube(debug_img_msg->image, m, TheCameraParameters);
+            aruco::CvDrawingUtils::draw3dAxis(debug_img_msg->image, m, TheCameraParameters);
+        }
+        markers_pub_debug.publish(debug_img_msg->toImageMsg());
     }
-
-    catch (cv_bridge::Exception &e) {
-        ROS_ERROR("cv_bridge exception: %s", e.what());
-        return;
-    }
-
-    debug->header = msg_header;
-    markers_pub_debug.publish(debug);
 }
 
 
@@ -212,7 +185,7 @@ void MarkerPosePublisher::publish_marker(geometry_msgs::Pose marker_pose, int ma
 
     marker.lifetime = ros::Duration(0.1);
 
-    markers_pub_tf.publish(marker);
+    markers_pub_visualization.publish(marker);
 }
 
 aruco::CameraParameters MarkerPosePublisher::rosCameraInfo2ArucoCamParams(const sensor_msgs::CameraInfo& cam_info,
