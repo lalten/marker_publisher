@@ -1,5 +1,5 @@
 # marker_publisher
-ros-package for [aruco304][1] released recently, by the end of 2017. 
+ros-package for [Aruco 3.0][1] released recently, by the end of 2017.
 
 It detects all the markers that belong to a particular dictionary that has been specified in *dict_type* with their sizes and publish them in MarkerArray message and as tranformations [tf][2]
 
@@ -13,7 +13,7 @@ Where i with the *id* of the marker and *m_i* its size.
 ### Prerequisites
 * Calibration:
 
-You need to calibrate the camera and copy the generated file in */config* folder in *marker_publisher*
+You need to calibrate the camera and make sure the camera_info is published (usually via [image_transport](http://ros.org/wiki/image_transport) and [camera_info_manager](http://wiki.ros.org/camera_info_manager)).
 
 * Install Aruco 3:
 
@@ -40,10 +40,19 @@ rosdep install --from-paths . --ignore-src --rosdistro=$ROS_DISTRO -y
         Header header
         marker_publisher/Marker[] markers
 
-### TODO
-This is a first version
+#### Parameters
 
-Much things to add (publish only if there's subscriber..etc)
-        
+Required:
+ * `markerSizeMeters`: Default marker size
+
+Optional:
+ * `dict_type`: What marker dictionary to use (default: `ALL_DICTS`)
+ * `error_correction_rate`: Default 0.6
+ * `marker_min`: Minimum marker size (default 0.01)
+ * `detection_mode`: default: `DM_NORMAL`
+ * `camera_frame`: If set, overwrite the outgoing header frame with this (default: unset, will use image's header frame)
+ * `default_transport`: Transport hint to use for incoming messages. Default: `raw`
+ * `marker_i`: Individual marker size, see above
+
 [1]: https://sourceforge.net/projects/aruco/files/3.0.0/
 [2]: http://wiki.ros.org/tf
