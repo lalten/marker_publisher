@@ -24,6 +24,8 @@ install-script: |
   make -j
   sudo make install
 
+  sudo rm /usr/local/lib/pkgconfig/aruco-uninstalled.pc # https://stackoverflow.com/a/50504809/5559867
+
 check-presence-script: |
   #!/bin/bash
 

@@ -1,20 +1,15 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(marker_publisher)
 
-
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++1z)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Ofast -march=native")
-set(aruco_INCLUDE_DIRS "/usr/local/include")
-set(aruco_LIB_DIRS "/usr/local/lib/libaruco.so")
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
-  dynamic_reconfigure
-  geometry_msgs
   sensor_msgs
   image_transport
   roscpp
@@ -25,11 +20,8 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-#find_package(OpenCV REQUIRED)
-find_package(OpenCV REQUIRED
-NO_MODULE # should be optional, tells CMake to use config mode
-PATHS /usr/local # look here
-NO_DEFAULT_PATH) # and don't look anywhere else
+find_package(OpenCV REQUIRED)
+find_package(aruco REQUIRED)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -118,9 +110,9 @@ NO_DEFAULT_PATH) # and don't look anywhere else
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  INCLUDE_DIRS include
+#  INCLUDE_DIRS include
 #  LIBRARIES marker_publisher
-  CATKIN_DEPENDS cv_bridge image_transport roscpp std_msgs
+#  CATKIN_DEPENDS cv_bridge image_transport roscpp std_msgs
 #  DEPENDS system_lib
 )
 
@@ -173,7 +165,7 @@ add_dependencies(markerpub ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED
 # target_link_libraries(${PROJECT_NAME}_node
 #   ${catkin_LIBRARIES}
 # )
-target_link_libraries(markerpub ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${aruco_LIB_DIRS})
+target_link_libraries(markerpub ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${aruco_LIBS})
 
 #############
 ## Install ##
