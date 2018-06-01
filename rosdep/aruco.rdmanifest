@@ -29,7 +29,7 @@ install-script: |
 check-presence-script: |
   #!/bin/bash
 
-  if `pkg-config aruco`; then
+  if [ `pkg-config aruco --modversion` ]; then
     version=$(pkg-config aruco --modversion)
 
     if dpkg --compare-versions "${version}" "ge" "3.0.4"; then
