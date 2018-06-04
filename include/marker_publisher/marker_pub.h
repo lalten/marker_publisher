@@ -1,3 +1,5 @@
+#pragma once
+
 #include <ros/ros.h>
 
 #include <image_transport/image_transport.h>
@@ -37,5 +39,7 @@ protected:
     image_transport::Publisher markers_pub_debug;
     marker_publisher::MarkerArray::Ptr marker_msg_pub;
     tf::TransformBroadcaster br;
+    std::map<int, ros::Publisher> posewithcovariancestamped_publishers;
+    bool publish_tf;
 };
 

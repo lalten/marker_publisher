@@ -2,6 +2,7 @@
 
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/transport_hints.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 
 MarkerPosePublisher::MarkerPosePublisher() : nh_node("~"), img_transport(nh_node) {
     // set dictionary and error correction rate
@@ -34,6 +35,8 @@ MarkerPosePublisher::MarkerPosePublisher() : nh_node("~"), img_transport(nh_node
 
     // Default marker size
     nh_node.param<float>("markerSizeMeters", markerSizeMeters, -1);
+
+    nh_node.param<bool>("publish_tf", publish_tf, true);
 
     // Set default_transport param to "compressed" in case you're using a rosbag that only contains compressed images
     std::string default_transport;
@@ -102,7 +105,10 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg, c
 
         tf::Transform object_transform = arucoMarker2Tf(detected_markers[i]);
 
-        br.sendTransform(tf::StampedTransform(object_transform, msg_header.stamp, msg_header.frame_id, o_str));
+        if(publish_tf)
+        {
+          br.sendTransform(tf::StampedTransform(object_transform, msg_header.stamp, msg_header.frame_id, o_str));
+        }
 
         geometry_msgs::Pose marker_pose_data;
 
@@ -124,6 +130,19 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg, c
         marker_i.idx = markerId;
         tf::Transform transform = arucoMarker2Tf(detected_markers[i]);
         tf::poseTFToMsg(transform, marker_i.pose.pose);
+
+        // Publish PoseWithCovarianceStamped on topic poses/marker_i
+        if(posewithcovariancestamped_publishers.count(markerId) == 0)
+        {
+          // If it doesn't exist yet, create this publisher
+          std::stringstream ss;
+          ss << "poses/marker_" << (int) markerId;
+          posewithcovariancestamped_publishers[markerId] = nh_node.advertise<geometry_msgs::PoseWithCovarianceStamped>(ss.str(), 1);
+        }
+        geometry_msgs::PoseWithCovarianceStamped pose_msg;
+        pose_msg.header = msg_header;
+        pose_msg.pose = marker_i.pose;
+        posewithcovariancestamped_publishers[markerId].publish(pose_msg);
     }
 
     // only publish if markers detected
