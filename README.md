@@ -23,7 +23,7 @@ You can have rosdep install Aruco. It might ask you for your password to install
 ```
 sudo sh -c 'echo "yaml https://rawgit.com/lalten/marker_publisher/master/rosdep/aruco.yaml " > /etc/ros/rosdep/sources.list.d/15-marker_publisher.list'
 rosdep update
-rosdep install --from-paths . --ignore-src --rosdistro=$ROS_DISTRO -y
+rosdep install -r --from-paths . --ignore-src -y marker_publisher
 ```
 
 ### ROS API
