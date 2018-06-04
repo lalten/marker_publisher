@@ -53,6 +53,7 @@ Optional:
  * `camera_frame`: If set, overwrite the outgoing header frame with this (default: unset, will use image's header frame)
  * `default_transport`: Transport hint to use for incoming messages. Default: `raw`
  * `publish_tf`: Publish transforms from camera frame to marker_i frame. Default: `true`
+ * `pose_covariance`: Pose covariance to set in PoseWithCovarianceStamped messages. Default: 1e-3.
  * `marker_i`: Individual marker size, see above
 
 [1]: https://sourceforge.net/projects/aruco/files/3.0.0/

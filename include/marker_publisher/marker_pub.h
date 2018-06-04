@@ -41,5 +41,6 @@ protected:
     tf::TransformBroadcaster br;
     std::map<int, ros::Publisher> posewithcovariancestamped_publishers;
     bool publish_tf;
+    double pose_covariance;
 };
 

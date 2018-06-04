@@ -36,7 +36,11 @@ MarkerPosePublisher::MarkerPosePublisher() : nh_node("~"), img_transport(nh_node
     // Default marker size
     nh_node.param<float>("markerSizeMeters", markerSizeMeters, -1);
 
+    // Whether to broadcast camera frame -> marker frame transforms
     nh_node.param<bool>("publish_tf", publish_tf, true);
+
+    // Covariance of PoseWithCovarianceStamped messages
+    nh_node.param<double>("pose_covariance", pose_covariance, 1e-3);
 
     // Set default_transport param to "compressed" in case you're using a rosbag that only contains compressed images
     std::string default_transport;
@@ -142,6 +146,12 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg, c
         geometry_msgs::PoseWithCovarianceStamped pose_msg;
         pose_msg.header = msg_header;
         pose_msg.pose = marker_i.pose;
+        // Fill diagonal of covariance matrix with covariance value
+        // Obviously it would be better to base this on some kind of image/detection quality parameter
+        for(int ii=0; ii<6; ++ii)
+        {
+          pose_msg.pose.covariance.at(0 + ii*6 + ii) = pose_covariance;
+        }
         posewithcovariancestamped_publishers[markerId].publish(pose_msg);
     }
 
