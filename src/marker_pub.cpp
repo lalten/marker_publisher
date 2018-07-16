@@ -1,5 +1,7 @@
 #include "marker_publisher/marker_pub.h"
 
+#include <opencv2/opencv.hpp>
+
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/transport_hints.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
@@ -81,6 +83,18 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg, c
         ROS_ERROR("cv_bridge exception: %s", e.what());
         return;
     }
+    cv::Mat cv_img = cv_ptr->image;
+
+    // If the image is a ROI, we need to add black borders to make sure TFs
+    // in aruco (calculated from pixels without ROI information) are correct
+    if(cinfo->roi.height != cinfo->height || cinfo->roi.width != cinfo->width)
+    {
+      int top = cinfo->roi.y_offset;
+      int bot = cinfo->height - cinfo->roi.height - top;
+      int left = cinfo->roi.x_offset;
+      int right = cinfo->width - cinfo->roi.width - left;
+      cv::copyMakeBorder(cv_ptr->image, cv_img, top, bot, left, right, cv::BORDER_CONSTANT, cv::Scalar(0,0,0));
+    }
 
     // copy stamp, header, seq. Overwrite frame_id if configured.
     std_msgs::Header msg_header = msg->header;
@@ -89,7 +103,7 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg, c
       msg_header.frame_id = camera_frame;
     }
 
-    std::vector<aruco::Marker> detected_markers = TheMarkerDetector.detect(cv_ptr->image);
+    std::vector<aruco::Marker> detected_markers = TheMarkerDetector.detect(cv_img);
 
     marker_msg_pub->markers.clear();
     marker_msg_pub->markers.resize(detected_markers.size());
@@ -163,7 +177,10 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg, c
     // publish debug image with markers
     if(markers_pub_debug.getNumSubscribers() > 0)
     {
-      cv_bridge::CvImagePtr debug_img_msg = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+        cv_bridge::CvImagePtr debug_img_msg(new cv_bridge::CvImage);
+        debug_img_msg->header = msg->header;
+        debug_img_msg->encoding = sensor_msgs::image_encodings::RGB8;
+        cv::cvtColor(cv_img, debug_img_msg->image, cv::COLOR_GRAY2RGB);
         for(auto &m : detected_markers)
         {
             m.draw(debug_img_msg->image, cv::Scalar(0, 0, 255), 3, true, true);

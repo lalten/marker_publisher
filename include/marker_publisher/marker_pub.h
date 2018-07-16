@@ -3,7 +3,6 @@
 #include <ros/ros.h>
 
 #include <image_transport/image_transport.h>
-#include <opencv2/opencv.hpp>
 
 #include <tf/transform_broadcaster.h>
 
