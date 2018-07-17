@@ -87,13 +87,16 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg, c
 
     // If the image is a ROI, we need to add black borders to make sure TFs
     // in aruco (calculated from pixels without ROI information) are correct
+    int roi_border_top = 0, roi_border_left = 0, roi_border_bot = 0, roi_border_right = 0;
     if(cinfo->roi.height != cinfo->height || cinfo->roi.width != cinfo->width)
     {
-      int top = cinfo->roi.y_offset;
-      int bot = cinfo->height - cinfo->roi.height - top;
-      int left = cinfo->roi.x_offset;
-      int right = cinfo->width - cinfo->roi.width - left;
-      cv::copyMakeBorder(cv_ptr->image, cv_img, top, bot, left, right, cv::BORDER_CONSTANT, cv::Scalar(0,0,0));
+      roi_border_top = cinfo->roi.y_offset;
+      roi_border_bot = cinfo->height - cinfo->roi.height - roi_border_top;
+      roi_border_left = cinfo->roi.x_offset;
+      roi_border_right = cinfo->width - cinfo->roi.width - roi_border_left;
+      cv::copyMakeBorder(cv_ptr->image, cv_img, roi_border_top, roi_border_bot,
+                         roi_border_left, roi_border_right, cv::BORDER_CONSTANT,
+                         cv::Scalar(0,0,0));
     }
 
     // copy stamp, header, seq. Overwrite frame_id if configured.
@@ -146,6 +149,9 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg, c
         //Publish markers
         marker_publisher::Marker &marker_i = marker_msg_pub->markers.at(i);
         marker_i.idx = markerId;
+        cv::Point2f centroid = detected_markers[i].getCenter();
+        marker_i.centroid_x = centroid.x - roi_border_left;
+        marker_i.centroid_y = centroid.y - roi_border_top;
         tf::Transform transform = arucoMarker2Tf(detected_markers[i]);
         tf::poseTFToMsg(transform, marker_i.pose.pose);
         // Fill diagonal of covariance matrix with covariance value
