@@ -148,6 +148,12 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg, c
         marker_i.idx = markerId;
         tf::Transform transform = arucoMarker2Tf(detected_markers[i]);
         tf::poseTFToMsg(transform, marker_i.pose.pose);
+        // Fill diagonal of covariance matrix with covariance value
+        // Obviously it would be better to base this on some kind of image/detection quality parameter
+        for(int ii=0; ii<6; ++ii)
+        {
+          marker_i.pose.covariance.at(0 + ii*6 + ii) = pose_covariance;
+        }
 
         // Publish PoseWithCovarianceStamped on topic poses/marker_i
         if(posewithcovariancestamped_publishers.count(markerId) == 0)
@@ -160,12 +166,6 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg, c
         geometry_msgs::PoseWithCovarianceStamped pose_msg;
         pose_msg.header = msg_header;
         pose_msg.pose = marker_i.pose;
-        // Fill diagonal of covariance matrix with covariance value
-        // Obviously it would be better to base this on some kind of image/detection quality parameter
-        for(int ii=0; ii<6; ++ii)
-        {
-          pose_msg.pose.covariance.at(0 + ii*6 + ii) = pose_covariance;
-        }
         posewithcovariancestamped_publishers[markerId].publish(pose_msg);
     }
 
